@@ -1,0 +1,41 @@
+[
+    {
+        "ver": "0.1",
+        "info": {
+            "id": "MsKcDm",
+            "date": "1522504686",
+            "viewed": 19,
+            "name": "Menger Sponge Variations",
+            "username": "larrylan",
+            "description": "ray marching & shading\nhttps:\/\/www.shadertoy.com\/view\/4sX3Rn\n\nfractal structure & coloring\nhttps:\/\/www.shadertoy.com\/view\/4dl3Wl\n\nanimation idea\nhttps:\/\/www.shadertoy.com\/view\/MslSDN\nhttps:\/\/www.shadertoy.com\/view\/XljSWm",
+            "likes": 0,
+            "published": 2,
+            "flags": 0,
+            "usePreview": 0,
+            "tags": [
+                "3d",
+                "raymarching",
+                "fractal",
+                "menger"
+            ],
+            "hasliked": 0,
+            "parentid": "",
+            "parentname": ""
+        },
+        "renderpass": [
+            {
+                "inputs": [],
+                "outputs": [
+                    {
+                        "id": "4dfGRr",
+                        "channel": 0
+                    }
+                ],
+                "code": "\/\/ I don't know how to correctly use liscence, sorry.\n\nfloat ctime;\n\n\/\/ return distance and address\nvec2 map( vec3 p )\n{\n    const float sz = 0.5;\n    const float sqrt3 = sqrt(3.0);\n    float c1 = 1.0-smoothstep(0.0,1.0,sin(0.1*ctime));\n    float c2 = (0.5*sign(-sin(0.1*ctime))+0.5)*smoothstep(0.0,0.5,pow(-abs(cos(0.1*ctime))+1.0,3.0));\n    float dp = (p.x+p.y+p.z-9.0*sz*c1)\/sqrt3; \/\/ distance to the plane\n    float ds = length(p)-sqrt3*3.0*sz; \/\/ distance to the sphere\n    const vec3 va = vec3(  1.0,  1.0,  1.0 );\n    const vec3 vb = vec3(  1.0,  1.0,  0.0 );\n    const vec3 vc = vec3(  1.0,  0.0,  1.0 );\n    const vec3 vd = vec3(  0.0,  1.0,  1.0 );\n    float df; \/\/ distance to the fractal\n    float a = 0.0;\n    float s = 1.0;\n    float r = 1.0;\n    p \/= sz*2.0;\n    for( int i=0; i<4; i++ )\n    {\n        float d, t;\n        vec3 v;\n        p = abs(p);\n        d = dot(p-va,p-va);              v=va; df=d; t=0.0;\n        d = dot(p-vb,p-vb); if( d<df ) { v=vb; df=d; t=1.0; }\n        d = dot(p-vc,p-vc); if( d<df ) { v=vc; df=d; t=1.0; }\n        d = dot(p-vd,p-vd); if( d<df ) { v=vd; df=d; t=1.0; }\n        p = 3.0*(p - v); r *= 3.0;\n        a = t + 2.0*a; s *= 2.0;\n    }\n    df = ((sqrt(df)-0.5)\/r);\n    return vec2( max(mix(df,ds,c2),dp), a\/s );\n}\n\nvec2 intersect( in vec3 ro, in vec3 rd )\n{\n    float t = 0.0;\n    vec2 res = vec2(-1.0);\n    vec2 h = vec2(1.0);\n    for( int i=0; i<400; i++ )\n    {\n        if( t>40.0 ) break;\n        h = map(ro + rd*t);\n        res = vec2(t,h.y);\n        t += h.x;\n    }\n    if( t>40.0 ) res=vec2(-1.0);\n    return res;\n}\n\nfloat softshadow( in vec3 ro, in vec3 rd, float mint, float k )\n{\n    float res = 1.0;\n    float t = mint;\n    float h = 1.0;\n    for( int i=0; i<64; i++ )\n    {\n        h = map(ro + rd*t).x;\n        res = min( res, k*h\/t );\n        t += clamp( h, 0.005, 0.1 );\n    }\n    return clamp(res,0.0,1.0);\n}\n\nvec3 calcNormal(in vec3 pos)\n{\n    vec3  eps = vec3(.0001,0.0,0.0);\n    vec3 nor;\n    nor.x = map(pos+eps.xyy).x - map(pos-eps.xyy).x;\n    nor.y = map(pos+eps.yxy).x - map(pos-eps.yxy).x;\n    nor.z = map(pos+eps.yyx).x - map(pos-eps.yyx).x;\n    return normalize(nor);\n}\n\nfloat calcOcclusion( in vec3 pos, in vec3 nor )\n{\n    float ao = 0.0;\n    float sca = 1.0;\n    for( int i=0; i<8; i++ )\n    {\n        float h = 0.001 + 0.5*pow(float(i)\/7.0,1.5);\n        float d = map( pos + h*nor ).x;\n        ao += -(d-h)*sca;\n        sca *= 0.95;\n    }\n    return clamp( 1.0 - 0.8*ao, 0.0, 1.0 );\n}\n\nvec3 render( in vec3 ro, in vec3 rd )\n{\n    \/\/ light\n\tconst vec3 light = normalize(vec3(1.0,0.9,0.3));\n    \/\/ background color\n    vec3 col = mix( vec3(0.3,0.2,0.1)*0.5, vec3(0.7, 0.9, 1.0), 0.5 + 0.5*rd.y );\n    \n    vec2 tmat = intersect(ro,rd);\n    if( tmat.x>0.0 )\n    {\n        vec3  pos = ro + tmat.x*rd;\n        vec3  nor = calcNormal(pos);\n        \n        float occ = calcOcclusion( pos, nor );\n        float sha = softshadow( pos, light, 0.01, 64.0 );\n\n        float dif = max(0.1 + 0.9*dot(nor,light),0.0);\n        float sky = 0.5 + 0.5*nor.y;\n        float bac = max(0.4 + 0.6*dot(nor,vec3(-light.x,light.y,-light.z)),0.0);\n\n        vec3 lin  = vec3(0.0);\n        lin += 1.00*dif*vec3(1.10,0.85,0.60)*sha;\n        lin += 0.50*sky*vec3(0.10,0.20,0.40)*occ;\n        lin += 0.10*bac*vec3(1.00,1.00,1.00)*(0.5+0.5*occ);\n        lin += 0.25*occ*vec3(0.15,0.17,0.20);     \n\n        vec3 matcol = 0.5 + 0.5*cos( 6.2831*tmat.y + vec3(0.0,1.0,2.0) );\n        col = matcol * lin;\n    }\n\n    return pow( col, vec3(0.4545) );\n}\n\nvoid mainImage( out vec4 fragColor, in vec2 fragCoord )\n{\n    vec2 p = -1.0 + 2.0 * fragCoord.xy \/ iResolution.xy;\n    p.x *= iResolution.x\/iResolution.y;\n\n    ctime = iTime;\n    \/\/ camera\n    vec3 ro = 2.0*vec3(2.5*sin(0.4*ctime),1.0-1.0*cos(0.2*ctime),2.5*cos(0.4*ctime));\n    vec3 ww = normalize(vec3(0.0) - ro);\n    vec3 uu = normalize(cross( vec3(0.0,1.0,0.0), ww ));\n    vec3 vv = normalize(cross(ww,uu));\n    vec3 rd = normalize( p.x*uu + p.y*vv + 2.5*ww );\n\n    vec3 col = render( ro, rd );\n    \n    fragColor = vec4(col,1.0);\n}",
+                "name": "Image",
+                "description": "",
+                "type": "image"
+            }
+        ]
+    }
+]
